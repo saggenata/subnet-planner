@@ -1,7 +1,12 @@
 // Преобразование IP-строки в число
 export function ipToNumber(ip) {
-  const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) {
+  const raw = ip.trim().split('.');
+  // Каждая часть — от 1 до 3 цифр, иначе "192.168.1." или "1..2.3" проходили как валидные
+  if (raw.length !== 4 || raw.some((p) => !/^\d{1,3}$/.test(p))) {
+    throw new Error('Некорректный IP-адрес');
+  }
+  const parts = raw.map(Number);
+  if (parts.some((p) => p > 255)) {
     throw new Error('Некорректный IP-адрес');
   }
   return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
@@ -26,7 +31,10 @@ export function cidrToMaskNumber(cidr) {
 // Преобразование маски в формате 255.255.255.0 в CIDR-число
 export function maskToCidr(maskStr) {
   const num = ipToNumber(maskStr);
-  return num.toString(2).split('1').length - 1;
+  const cidr = num.toString(2).split('1').length - 1;
+  // Единицы маски должны идти подряд слева: 255.0.255.0 — не маска
+  if (cidrToMaskNumber(cidr) !== num) throw new Error('Некорректная маска');
+  return cidr;
 }
 
 // Принимает маску в любом формате ("24" или "/24" или "255.255.255.0") и возвращает CIDR
@@ -35,9 +43,8 @@ export function parseMaskInput(input) {
   if (trimmed.includes('.')) {
     return maskToCidr(trimmed);
   }
-  const cidr = Number(trimmed);
-  if (isNaN(cidr)) throw new Error('Некорректная маска');
-  return cidr;
+  if (!/^\d{1,2}$/.test(trimmed)) throw new Error('Некорректная маска');
+  return Number(trimmed);
 }
 
 export function isPrivate(ipNum) {
@@ -69,7 +76,8 @@ export function calculateSubnet(ipStr, maskInput) {
   const broadcastNum = (networkNum | wildcardNum) >>> 0;
 
   const totalHosts = Math.pow(2, 32 - cidr);
-  const usableHosts = cidr >= 31 ? 0 : totalHosts - 2;
+  // /31 — два адреса для point-to-point (RFC 3021), /32 — один адрес
+  const usableHosts = cidr >= 31 ? totalHosts : totalHosts - 2;
 
   const firstHostNum = cidr >= 31 ? networkNum : networkNum + 1;
   const lastHostNum = cidr >= 31 ? broadcastNum : broadcastNum - 1;
@@ -107,6 +115,11 @@ export function calculateVLSM(parentIp, parentMaskInput, requirements) {
   const parentEnd = parentNetworkNum + parentTotalHosts - 1;
 
   for (const req of sorted) {
+    if (!Number.isInteger(req.hostsNeeded) || req.hostsNeeded < 1) {
+      results.push({ name: req.name, error: 'Число хостов должно быть целым и больше 0' });
+      continue;
+    }
+
     // Находим минимальный размер подсети (степень двойки), вмещающий hosts + 2 (сеть и broadcast)
     const needed = req.hostsNeeded + 2;
     const newHostBits = Math.max(0, Math.ceil(Math.log2(needed)));
@@ -138,7 +151,7 @@ export function calculateVLSM(parentIp, parentMaskInput, requirements) {
       broadcast: numberToIp(broadcastNum),
       firstHost: numberToIp(subnetCidr >= 31 ? networkNum : networkNum + 1),
       lastHost: numberToIp(subnetCidr >= 31 ? broadcastNum : broadcastNum - 1),
-      usableHosts: subnetCidr >= 31 ? 0 : subnetSize - 2,
+      usableHosts: subnetCidr >= 31 ? subnetSize : subnetSize - 2,
     });
 
     cursor = broadcastNum + 1;
