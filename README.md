@@ -1,16 +1,72 @@
-# React + Vite
+# Subnet Planner
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Калькулятор IPv4-подсетей и VLSM в браузере.
 
-Currently, two official plugins are available:
+**Демо:** https://subnet-planner-taupe.vercel.app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Возможности
 
-## React Compiler
+### Базовый расчёт
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Вводите IP-адрес и маску и получаете:
 
-## Expanding the Oxlint configuration
+- адрес сети и broadcast-адрес;
+- маску подсети и wildcard-маску;
+- первый и последний адрес хоста;
+- общее число адресов и сколько из них можно отдать хостам;
+- класс сети (A–E) и тип адреса (приватный или публичный).
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Маску можно ввести в любом формате: `24`, `/24` или `255.255.255.0`.
+
+Для `/31` доступно 2 адреса (point-to-point, RFC 3021), для `/32` — 1.
+
+### VLSM
+
+Делит родительскую сеть на подсети разного размера под нужное число хостов.
+
+1. Укажите родительскую сеть, например `192.168.0.0/24`.
+2. Добавьте подсети с названиями и числом хостов.
+3. Нажмите «Распределить подсети».
+
+Для каждой подсети подбирается минимальный подходящий размер. Подсети
+размещаются от большой к маленькой, чтобы адресное пространство не
+дробилось. Если подсеть не помещается, в таблице будет ошибка.
+
+Пример для `192.168.0.0/24`:
+
+| Подсеть | Хостов нужно | Результат | Доступно |
+|---|---|---|---|
+| Отдел продаж | 50 | 192.168.0.0/26 | 62 |
+| Отдел IT | 20 | 192.168.0.64/27 | 30 |
+| Гостевая сеть | 10 | 192.168.0.96/28 | 14 |
+
+## Запуск локально
+
+Нужен [Node.js](https://nodejs.org) версии 20.19 или новее.
+
+```bash
+npm install
+npm run dev
+```
+
+После этого откройте адрес, который покажет терминал (обычно http://localhost:5173).
+
+Другие команды:
+
+- `npm run build` — собрать сайт в папку `dist`;
+- `npm run preview` — посмотреть собранную версию;
+- `npm run lint` — проверить код линтером.
+
+## Структура
+
+- `src/lib/subnet.js` — вся логика расчётов (без React, можно использовать отдельно);
+- `src/App.jsx` — интерфейс;
+- `src/App.css` — стили.
+
+## Технологии
+
+React 19, Vite 8, Oxlint. Сайт деплоится на Vercel автоматически при пуше в `main`.
+
+## Лицензия
+
+[MIT](LICENSE)
